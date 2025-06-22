@@ -1,0 +1,103 @@
+---
+- name: Configure Docker host and deploy application
+  hosts: deploy_target
+  become: yes
+  vars:
+    ecr_repo: "482720962971.dkr.ecr.us-east-1.amazonaws.com/dotnetapp666"
+    container_name: "myapp"
+    app_port: 80
+    host_port: 8080
+    aws_region: "us-east-1"
+
+  tasks:
+    # Docker
+    - name: Install required system packages
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+        - python3-pip
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker CE
+      apt:
+        name: "docker-ce"
+        state: present
+
+    - name: Install Docker Python module
+      pip:
+        name: docker
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    # AWS CLI config
+    - name: Install AWS CLI
+      pip:
+        name: awscli
+
+    - name: Configure AWS credentials
+      become: no
+      aws_secret:
+        profile: default
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+      when: aws_access_key is defined and aws_secret_key is defined
+
+    # Deploy
+    - name: Login to AWS ECR
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | docker login --username AWS --password-stdin {{ ecr_repo }}
+      register: login_result
+      changed_when: "'Login Succeeded' in login_result.stdout"
+
+    - name: Stop and remove existing container if exists
+      docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Pull the latest image from ECR
+      docker_image:
+        name: "{{ ecr_repo }}:{{ image_tag }}"
+        source: pull
+        force_source: yes
+
+    - name: Run the application container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ ecr_repo }}:{{ image_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "{{ host_port }}:{{ app_port }}"
+        env:
+          ASPNETCORE_ENVIRONMENT: "Production"
+
+    - name: Verify container is running
+      docker_container_info:
+        name: "{{ container_name }}"
+      register: container_info
+
+    - name: Print container status
+      debug:
+        msg: "Container is running with ID: {{ container_info.container.Id }}"
+      when: container_info.container.State.Status == 'running'
