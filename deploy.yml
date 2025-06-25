@@ -66,14 +66,11 @@
       args:
         creates: /usr/local/bin/aws
 
-    - name: Configure AWS credentials
-      become: no
-      aws_secret:
-        profile: default
-        aws_access_key: "{{ aws_access_key }}"
-        aws_secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"
-      when: aws_access_key is defined and aws_secret_key is defined
+    - name: Login to AWS ECR with token from Jenkins
+      shell: |
+        echo "{{ ECR_TOKEN}}" | docker login --username AWS --password-stdin {{ ecr_repo }}
+      register: login_result
+      changed_when: "'Login Succeeded' in login_result.stdout"
 
     # Deploy
     - name: Login to AWS ECR
