@@ -38,9 +38,8 @@
         name: "docker-ce"
         state: present
 
-    - name: Install Docker Python module
-      pip:
-        name: docker
+    - name: Install Docker Python module (bypass PEP 668)
+      command: python3 -m pip install docker --break-system-packages
 
     - name: Add ubuntu user to docker group
       user:
