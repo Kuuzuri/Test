@@ -72,12 +72,12 @@
       register: login_result
       changed_when: "'Login Succeeded' in login_result.stdout"
 
-    # Deploy
-    - name: Login to AWS ECR with token from Jenkins
-      shell: |
-        echo "{{ ecr_token }}" | docker login --username AWS --password-stdin {{ ecr_repo }}
-      register: login_result
-      changed_when: "'Login Succeeded' in login_result.stdout"
+    # # Deploy
+    # - name: Login to AWS ECR with token from Jenkins
+    #   shell: |
+    #     echo "{{ ecr_token }}" | docker login --username AWS --password-stdin {{ ecr_repo }}
+    #   register: login_result
+    #   changed_when: "'Login Succeeded' in login_result.stdout"
 
     - name: Stop and remove existing container if exists
       docker_container:
